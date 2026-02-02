@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "FilmNyilvantarto (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "FilmNyilvantarto (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
