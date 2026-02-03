@@ -15,7 +15,10 @@ using Windows.Foundation;
 using Windows.Foundation.Collections;
 using System.Text.Json;
 using System.Threading.Tasks;
-
+using System.Runtime.InteropServices;
+using Windows.Storage.Pickers;
+using System.Text;
+using Windows.Graphics.Printing3D;
 
 namespace FilmNyilvantarto
 {
@@ -35,6 +38,10 @@ namespace FilmNyilvantarto
         {
             InitializeComponent();
 
+            this.Title = "FilmNyilvántartó";
+
+            SetWindowIcon();
+
             MovieListView.ItemsSource = FilteredMovies;
 
             (this.Content as FrameworkElement).Loaded += MainWindow_Loaded;
@@ -47,6 +54,37 @@ namespace FilmNyilvantarto
                 appWindow.Resize(new Windows.Graphics.SizeInt32(320, 500));
             }
         }
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        private const uint WM_SETICON = 0x0080;
+        private const IntPtr ICON_SMALL = 0;
+        private const IntPtr ICON_BIG = 1;
+
+        private void SetWindowIcon()
+        {
+            IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            Microsoft.UI.WindowId windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
+            var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
+
+            string iconPath = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets/film_icon.ico");
+
+            if (System.IO.File.Exists(iconPath))
+            {
+                appWindow.SetIcon(iconPath);
+
+                IntPtr hIcon = LoadImage(IntPtr.Zero, iconPath, 1, 0, 0, 0x00000010 | 0x00008000);
+                if (hIcon != IntPtr.Zero)
+                {
+                    SendMessage(hWnd, WM_SETICON, ICON_SMALL, hIcon);
+                    SendMessage(hWnd, WM_SETICON, ICON_BIG, hIcon);
+                }
+            }
+        }
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern IntPtr LoadImage(IntPtr hInst, string lpszName, uint uType, int cxDesired, int cyDesired, uint fuLoad);
+
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             await LoadMoviesFromFile();
@@ -198,6 +236,61 @@ namespace FilmNyilvantarto
                 await SaveMoviesToFile();
                 UpdateFilteredList(SearchTextBox.Text);
             }
+        }
+
+        private async void OnDownloadClick(object sender, RoutedEventArgs e)
+        {
+            var savePicker = new FileSavePicker();
+            IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            WinRT.Interop.InitializeWithWindow.Initialize(savePicker, hWnd);
+
+            savePicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+            savePicker.FileTypeChoices.Add("Excel CSV", new List<string>() { ".csv" });
+            savePicker.SuggestedFileName = "Filmlista";
+
+            var file = await savePicker.PickSaveFileAsync();
+            if (file != null)
+            {
+                StringBuilder csvContent = new StringBuilder();
+                csvContent.AppendLine("Cím;Megjelenési év");
+
+                foreach (var movie in AllMovies)
+                {
+                    csvContent.AppendLine($"{movie.Title};{movie.ReleaseYear}");
+                }
+                await System.IO.File.WriteAllTextAsync(file.Path, csvContent.ToString(), Encoding.UTF8);
+            }
+        }
+        private async void OnUploadClick(object sender,RoutedEventArgs e)
+        {
+            var openPicker = new FileOpenPicker();
+            IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            WinRT.Interop.InitializeWithWindow.Initialize(openPicker, hWnd);
+            openPicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+            openPicker.FileTypeFilter.Add(".csv");
+            var file = await openPicker.PickSingleFileAsync();
+            if (file != null)
+            {
+                var lines = await System.IO.File.ReadAllLinesAsync(file.Path, Encoding.UTF8);
+                for (int i = 1;i< lines.Length;i++)
+                {
+                    var parts = lines[i].Split(';');
+                    if(parts.Length >= 2)
+                    {
+                        string title = parts[0].Trim();
+                        if(int.TryParse(parts[1].Trim(), out int year))
+                        {
+                            bool exists = AllMovies.Any(m => m.Title.Equals(title, StringComparison.OrdinalIgnoreCase) && m.ReleaseYear == year);
+                            if(!exists)
+                            {
+                                AllMovies.Add(new Movie { Title = title, ReleaseYear = year });
+                            }
+                        }
+                    }
+                }
+            }
+            await SaveMoviesToFile();
+            UpdateFilteredList(SearchTextBox.Text);
         }
     }
 }

@@ -31,6 +31,20 @@
                     Width="40"
                     Height="40"
                     Style="{StaticResource AccentButtonStyle}"/>
+            <Button x:Name="DownloadButton" 
+                    Click="OnDownloadClick"
+                    Content="⇣" 
+                    FontSize="20"
+                    Width="40"
+                    Height="40"
+                    Style="{StaticResource AccentButtonStyle}"/>    
+            <Button x:Name="UploadButton" 
+                    Click="OnUploadClick"
+                    Content="⇡" 
+                    FontSize="20"
+                    Width="40"
+                    Height="40"
+                    Style="{StaticResource AccentButtonStyle}"/>
         </StackPanel>
         <ListView x:Name="MovieListView" Grid.Row="1">
             <ListView.ItemTemplate>
